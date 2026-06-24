@@ -183,6 +183,12 @@ Wait for Complete: false
 
 ## Development
 
+Dari root monorepo, masuk ke directory module:
+
+```bash
+cd n8n-modules/n8n-nodes-wazuh
+```
+
 Install dependency:
 
 ```bash

@@ -1,14 +1,17 @@
 # Dependencies
 node_modules/
+.pnpm-store/
 
 # Build output
 dist/
+coverage/
 *.tsbuildinfo
 
-# Local environment and secrets
+# Local environment, npm auth, and secrets
 .env
 .env.*
 !.env.example
+.npmrc
 
 # Logs
 logs/
@@ -38,6 +41,6 @@ Thumbs.db
 .vscode/
 .idea/
 
-# Codex/local agent state
+# Local AI agent state
 .codex/
 .agents/

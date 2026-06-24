@@ -1,7 +1,8 @@
 version: 2
 updates:
+  # Add one npm entry per module under /n8n-modules.
   - package-ecosystem: "npm"
-    directory: "/"
+    directory: "/n8n-modules/n8n-nodes-wazuh"
     schedule:
       interval: "weekly"
     groups:

@@ -3,7 +3,7 @@
 	"version": "0.1.4",
 	"description": "n8n community node for running Wazuh Manager active response commands",
 	"license": "MIT",
-	"homepage": "",
+	"homepage": "https://github.com/Thrive-Developer/boc/tree/main/n8n-modules/n8n-nodes-wazuh",
 	"keywords": [
 		"n8n-community-node-package"
 	],
@@ -13,7 +13,8 @@
 	},
 	"repository": {
 		"type": "git",
-		"url": "git+https://github.com/beyond-ordinary-cloud/n8n-nodes-wazuh.git"
+		"url": "git+https://github.com/Thrive-Developer/boc.git",
+		"directory": "n8n-modules/n8n-nodes-wazuh"
 	},
 	"scripts": {
 		"build": "n8n-node build",

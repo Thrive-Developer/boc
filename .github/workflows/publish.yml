@@ -1,4 +1,4 @@
-# Publishes this n8n community node package to npm on every version tag push.
+# Publishes an n8n community node package to npm.
 #
 # Starting May 1 2026, n8n requires all community nodes to be published via
 # GitHub Actions with npm provenance statements. This workflow satisfies that
@@ -27,23 +27,26 @@
 #        Repository name:  <your-repo-name>
 #        Workflow name:    publish.yml
 #        Environment:      (leave blank unless you use GitHub Environments)
-#   4. Leave the NPM_TOKEN secret unset in this repository. GitHub's OIDC
+#   4. Leave the NPM_TOKEN/NPMJS_TOKEN secret unset in this repository. GitHub's OIDC
 #      token is used instead — no secret ever touches your repo settings.
 #
 # Option B — npm Automation Token (fallback):
 #   1. On npmjs.com: Access Tokens → Generate New Token → Granular Access Token.
 #      Scope it to this package with "Read and write" publish permission.
 #   2. In GitHub: Settings → Secrets and variables → Actions → New secret.
-#      Name it NPM_TOKEN and paste the token value.
+#      Name it NPM_TOKEN or NPMJS_TOKEN and paste the token value.
 #
 # Both options work with --provenance. Provenance is signed by GitHub's OIDC
 # infrastructure regardless of how npm authentication is handled.
 #
 # ─── TAG CONVENTION ────────────────────────────────────────────────────────────
 #
-# This workflow triggers on tags matching "*.*.*" (e.g. 0.2.0).
-# If you prefer tags with a "v" prefix (e.g. v0.2.0), change the filter to:
-#   tags: ['v*.*.*']
+# In this monorepo, prefer module-specific tags:
+#
+#   n8n-nodes-wazuh@0.2.0
+#
+# Plain semver tags such as 0.2.0 are accepted only while the repo has one
+# module, because they become ambiguous once multiple modules exist.
 #
 # ─── RELEASE PROCESS ───────────────────────────────────────────────────────────
 #
@@ -59,9 +62,17 @@ name: Publish
 on:
   push:
     tags:
-      # Matches 0.1.0, 1.2.3, 2.0.0-rc.1, etc.
-      # See "TAG CONVENTION" above if you prefer tags with a "v" prefix.
+      - '*@*.*.*'
       - '*.*.*'
+  workflow_dispatch:
+    inputs:
+      module_path:
+        description: 'Module directory to publish'
+        required: true
+        type: choice
+        default: n8n-modules/n8n-nodes-wazuh
+        options:
+          - n8n-modules/n8n-nodes-wazuh
 
 jobs:
   publish:
@@ -77,25 +88,63 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Resolve module
+        id: module
+        shell: bash
+        env:
+          DISPATCH_MODULE_PATH: ${{ inputs.module_path }}
+        run: |
+          set -euo pipefail
+
+          if [ "${GITHUB_EVENT_NAME}" = "workflow_dispatch" ]; then
+            module_path="${DISPATCH_MODULE_PATH}"
+          else
+            tag_name="${GITHUB_REF_NAME}"
+
+            if [[ "${tag_name}" == *@* ]]; then
+              module_name="${tag_name%@*}"
+              module_path="n8n-modules/${module_name}"
+            else
+              mapfile -t module_paths < <(find n8n-modules -mindepth 2 -maxdepth 2 -name package.json -exec dirname {} \; | sort)
+
+              if [ "${#module_paths[@]}" -ne 1 ]; then
+                echo "::error::Use tag format <module-dir-name>@<version>, for example n8n-nodes-wazuh@0.2.0."
+                exit 1
+              fi
+
+              module_path="${module_paths[0]}"
+            fi
+          fi
+
+          if [ ! -f "${module_path}/package.json" ]; then
+            echo "::error::Cannot find package.json at ${module_path}/package.json."
+            exit 1
+          fi
+
+          echo "module_path=${module_path}" >> "$GITHUB_OUTPUT"
+
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 'lts/*'
           cache: 'npm'
+          cache-dependency-path: ${{ steps.module.outputs.module_path }}/package-lock.json
 
       - name: Install dependencies
         run: npm ci
+        working-directory: ${{ steps.module.outputs.module_path }}
 
       - name: Release
         # Publishes to npm with a provenance attestation (requires id-token: write above).
         # Lint and build run automatically as part of the release process.
         #
-        # Option A (OIDC): leave NPM_TOKEN unset — the token step is skipped and
+        # Option A (OIDC): leave NPM_TOKEN/NPMJS_TOKEN unset — the token step is skipped and
         #   npm uses the OIDC exchange instead.
-        # Option B (token): set NPM_TOKEN in repo secrets — it is written to
+        # Option B (token): set NPM_TOKEN or NPMJS_TOKEN in repo secrets — it is written to
         #   .npmrc here before publishing.
         run: |
           [ -n "$NPM_TOKEN" ] && npm config set //registry.npmjs.org/:_authToken "$NPM_TOKEN"
           npm run release
+        working-directory: ${{ steps.module.outputs.module_path }}
         env:
-          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN || secrets.NPMJS_TOKEN }}
